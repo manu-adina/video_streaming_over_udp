@@ -11,6 +11,7 @@
 
 
 int createPipeline(void) {
+    // Pipeline stack. TODO: Needs serious adjustment, won't work with out system
     pipeline = gst_pipeline_new("video_stream"); // Creates a pipeline with a given name
     source = gst_element_factory_make("mfw_v4lsrc", "vidsrc"); // 
     convcapsfilter = gst_element_factory_make("capsfilter", NULL);
@@ -20,6 +21,8 @@ int createPipeline(void) {
     payloader = gst_element_factory_make("rtph264pay", "payloader");
     sink = gst_element_factroy_make("udpsink", "netsink");
 
+
+
     // All created fine
     if (!pipeline || !source || !convcapsfilter || !converter || !encapsfilter || !encoder || !payloader || !sink) {
         std::cout << "Pipeline creation, unsuccessful" << std::endl;
@@ -27,12 +30,12 @@ int createPipeline(void) {
     }
 
     // TODO: Above this line, need to create a pipeline that takes in OpenCV frames.
-    
 
 
-    
+    // All the params are then set.
 
-    // Hard
+
+    return 0;
 }
 
 int main(int argc, char *argv[]) {
