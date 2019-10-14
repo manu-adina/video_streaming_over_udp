@@ -5,6 +5,8 @@
 #define UDP_IP "192.168.0.124"
 
 
+
+
 // Creating a socket to receive sent frames from GStreamer
 static int create_socket(int tos) {
     int fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -24,15 +26,30 @@ static int create_socket(int tos) {
         return -1;
     }
 
+    // TODO: Don't really understands what's happening under this block. Need to figure it out. 
     // Set socket to send as well. 
     if(setsockopt(fd, IPPROTO_IP, IP_TOS, &tos, sizeof(tos)) != 0) {
         std::cout << "Error setting socket options" << std::endl;
         return -1;
     }
+
+    return fd;
 }
 
 
 int main(int argc, const char *argv[]) {
+
+
+
+    bool frame_complete = false;
+    struct pkt frame_pkts[max_frame_packets];
+    int small_packet_count = 0;
+
+
+    // For drop packet information.
+    int seq = 0;
+    int last_seq = 0;
+    int drops = 0;
 
     int fd = create_socket(app_video_tos);
     if(fd < 0) {
@@ -43,6 +60,7 @@ int main(int argc, const char *argv[]) {
     while(1) {
 
 
+        // TODO: Need to understand this time stuff. Why even need it
         uint64_t now_us = clock_gettime_us(CLOCK_MONOTONIC);
         int timeout_ms;
 
@@ -51,6 +69,8 @@ int main(int argc, const char *argv[]) {
 
         if(timeout_ms < 0) timeout_ms = 0;
 
+
+        // TODO: What is fd_set and pollrc struct type?
         fd_set[0].revents = 0;
         int pollrc = poll(fd_set, num_fds, timeout_ms);
 
@@ -77,7 +97,7 @@ int main(int argc, const char *argv[]) {
 
                 // If this is a full frame, send it. Or if out of memory, send it.
                 // Note 0x5c indicates that it's the last packet.
-                // and 0x81 indicates that it's an FEC data packet
+                // and 0x81 indicates some FEC information. Not sure why 0x81 is used.
                 if((pkt_buf[12] == 0x5c && pkt_buf[13] == 0x81) || frame_pkt_idx == max_frame_packets - 1)
                     frame_complete = true;
                 
@@ -93,7 +113,7 @@ int main(int argc, const char *argv[]) {
                 bytes_count += pkt_bytes;
 
                 if(frame_complete) {
-
+                    
 
                     
                 }
