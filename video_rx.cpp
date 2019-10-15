@@ -5,6 +5,14 @@
 #define UDP_IP "192.168.0.124"
 
 
+static const unsigned int max_packet_bytes = 2000;
+static const unsigned int max_frame_packets = 128;
+
+struct pkt {
+    char buf[max_packet_bytes];
+    uint16_t len;
+}
+
 
 
 // Creating a socket to receive sent frames from GStreamer
@@ -39,9 +47,8 @@ static int create_socket(int tos) {
 
 int main(int argc, const char *argv[]) {
 
-
-
     bool frame_complete = false;
+    unsigned int frame_pkt_idx = 0;
     struct pkt frame_pkts[max_frame_packets];
     int small_packet_count = 0;
 
@@ -51,41 +58,50 @@ int main(int argc, const char *argv[]) {
     int last_seq = 0;
     int drops = 0;
 
+    // Create a socket for receiving RTP video packets.
     int fd = create_socket(app_video_tos);
     if(fd < 0) {
         return 1;
     }
 
+    // Setting up polling information.
+    const int num_fds = 1;
+    struct pollfd fd_set[num_fds];
+    memset(fd_set, 0, sizeof(fd_set));
+    fd_set[0].fd = fd;
+    fd_set[0].event = POLLIN; // Setting an event that there is data to read.
+
     // Handle downlink video packets.
     while(1) {
 
-
         // TODO: Need to understand this time stuff. Why even need it
-        uint64_t now_us = clock_gettime_us(CLOCK_MONOTONIC);
-        int timeout_ms;
+        //uint64_t now_us = clock_gettime_us(CLOCK_MONOTONIC);
+        int timeout_ms = 100;
 
-        if(log_time_us < app_check_us) timeout_ms = (log_time_us - now_us) / 1000 + 1;
-        else timeout_ms = (app_check_us - now_us) / 1000 + 1;
+        //if(log_time_us < app_check_us) timeout_ms = (log_time_us - now_us) / 1000 + 1;
+        //else timeout_ms = (app_check_us - now_us) / 1000 + 1;
 
-        if(timeout_ms < 0) timeout_ms = 0;
+        //if(timeout_ms < 0) timeout_ms = 0;
 
-
-        // TODO: What is fd_set and pollrc struct type?
+        // if poll returns with an error. fd_set is unmodified so putting revents as 0
+        // to prevent false-detection.
         fd_set[0].revents = 0;
         int pollrc = poll(fd_set, num_fds, timeout_ms);
-
+        
+        // Poll info is returned and that there is data to be read, receive packets.
         if((pollrc > 0) && (fd_set[0].revents & POLLIN)) {
             char pkt_buf[max_packet_bytes];
             ssize_t pkt_bytes = recv(fd, pkt_buf, sizeof(pkt_buf),0);
 
-            now_us = clock_gettime_us(CLOCK_MONOTONIC);
+            //now_us = clock_gettime_us(CLOCK_MONOTONIC);
 
             if(pkt_bytes <= 0) {
                 std::cout << "Error receiving" << std::endl;
                 sleep(1)
             } else {
-                
-                // Extracing the sequency number from the header.
+                // Process the packet if it was received properly.
+
+                // Extracting the sequency number from the header.
                 seq = pkt_buf[2] << 8 | pkt_buf[3];
                 if(seq > (last_seq + 1) && last_seq && seq > last_seq)
                     drops += (seq - last_seq - 1);
@@ -113,11 +129,20 @@ int main(int argc, const char *argv[]) {
                 bytes_count += pkt_bytes;
 
                 if(frame_complete) {
+                    // Send full frame packets.
                     
-
-                    
+                } else {
+                    ++frame_pkt_idx;
+                    if(frame_pkt_idx >= max_frame_packets) {
+                        frame_pkt_idx = 0;
+                        continue;
+                    }
                 }
             }
-
-    }
+        
+        } else {
+            //now_us = clock_gettime_us(CLOCK_MONOTONIC);
+        }
+    } // end while
+    return 0;
 }
